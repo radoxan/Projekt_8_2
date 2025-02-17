@@ -1,0 +1,4 @@
+drawing_number,name,height_before_bending,width_before_bending,model,pattern,drawing,nums_of_corr,material,thickness,bending_radius,mass,additional_note,number_of_bends
+600.100.009,Poprzeczka,1287.0,150.1,11,11,12,1,DX51D,1.5,1.5,2.2,Niewymiarowana geometria wg dokumentacji DXF. Detal symetryczny.,2
+600.100.00.03,Tablica,1301.0,345.6,6,6,6,5,DX51D,2.0,1.5,6.98,Otwory niesymetryczne,3
+600.100.00.04,Wzmocnienie pod oœ,480.0,146.0,5,5,5,2,DX51D,2.5,3.0,1.23,Brak,2
