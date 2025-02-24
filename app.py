@@ -2,20 +2,18 @@ import streamlit as st
 import pandas as pd
 from dotenv import dotenv_values
 from openai import OpenAI
-from IPython.display import Markdown, Image
 import fitz  # PyMuPDF
 import base64
 import instructor
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel
 import csv
 import os
-import json
+import numpy as np
 
+st.set_page_config(layout="wide")
 csv_name = 'dane.csv'
 token = st.sidebar.text_input("Wprowadz token OpenAI")
-# Lista zakładek
 sidebar_choice = ["Dodawanie elementu", "Przegląd bazy danych"]
-# Wybór zakładki z listy w sidebar
 choice = st.sidebar.radio("Wybierz zakładkę", sidebar_choice)
 
 def prepare_image_for_open_ai(image_data):
@@ -77,7 +75,11 @@ def read_data_from_document(image_data):
     return result
 
 def add_info_to_csv(csv_name, pdf_info):
-    dane = [pdf_info]
+    if pdf_info.empty:
+        st.error("Brak danych do zapisania.")
+        return
+
+    dane = [pdf_info.to_dict(orient='records')[0]]
     plik_istnieje = os.path.isfile(csv_name)
     unikalne_dane = set()
 
@@ -89,8 +91,8 @@ def add_info_to_csv(csv_name, pdf_info):
 
     with open(csv_name, mode='a' if plik_istnieje else 'w', newline='') as plik:
         fieldnames = ['drawing_number', 'name', 'height_before_bending', 'width_before_bending', 'model', 
-                    'pattern', 'drawing', 'nums_of_corr', 'material', 'thickness', 
-                    'bending_radius', 'mass', 'additional_note', 'number_of_bends']
+                      'pattern', 'drawing', 'nums_of_corr', 'material', 'thickness', 
+                      'bending_radius', 'mass', 'additional_note', 'number_of_bends']
         writer = csv.DictWriter(plik, fieldnames=fieldnames)
         
         if not plik_istnieje:
@@ -100,19 +102,47 @@ def add_info_to_csv(csv_name, pdf_info):
             klucz = (wiersz['drawing_number'], wiersz['pattern'], wiersz['drawing'])
             if klucz in unikalne_dane:
                 print(f"Duplikat znaleziony: {wiersz}")
-                st.text(f"Znaleziono duplikat! Indeks {wiersz} nie został dodany do bazy!")
+                st.text(f"Znaleziono duplikat! Indeks {wiersz['drawing_number']} nie został dodany do bazy!")
             else:
                 writer.writerow(wiersz)
                 unikalne_dane.add(klucz)
-                st.text(f"Indeks {wiersz} został dodany do bazy!")                
+                st.text(f"Indeks {wiersz['drawing_number']} został dodany do bazy!")                
+
+def add_edit_bar(column_name, value_name, type, number_format, key_suffix):
+    if type == 'text': 
+        if not st.session_state.pdf_info.empty:
+            name_value = st.session_state.pdf_info[column_name].iloc[0]
+            st.text_input(label=value_name, value=name_value, key=f"{column_name}_{key_suffix}")
+        else:
+            st.text_input(label=value_name, value='', key=f"{column_name}_{key_suffix}")
+    elif type == 'number':
+        if not st.session_state.pdf_info.empty:
+            name_value = st.session_state.pdf_info[column_name].iloc[0]
+            st.number_input(label=value_name, value=float(name_value), format=number_format, key=f"{column_name}_{key_suffix}")
+        else:
+            st.number_input(label=value_name, value=0.0, format=number_format, key=f"{column_name}_{key_suffix}")
+    else:
+        print("Wartość type nieprawidłowa")
+
+def update_dataframe_from_inputs(dataframe, row, col):
+    key = f"{col}_{row}"
+    if key in st.session_state:
+        new_value = st.session_state[key]
+        if col in ['drawing_number', 'name', 'material', 'additional_note']:
+            dataframe.at[row, col] = new_value
+        else:
+            dataframe.at[row, col] = float(new_value)
 
 st.header("Aplikacja do odczytu danych")
 
-if 'pdf_info_df' not in st.session_state:
-    st.session_state.pdf_info_df = []
+column_names_df = {'drawing_number': [''], 'name': [''], 'height_before_bending': [0], 'width_before_bending': [0], 'model': [0], 
+                   'pattern': [0], 'drawing': [0], 'nums_of_corr': [0], 'material': [''], 'thickness': [0], 
+                   'bending_radius': [0], 'mass': [0], 'additional_note': [''], 'number_of_bends': [0]}
 
 if 'pdf_info' not in st.session_state:
-    st.session_state.pdf_info = None
+    st.session_state.pdf_info = pd.DataFrame(column_names_df)
+elif isinstance(st.session_state.pdf_info, dict):
+    st.session_state.pdf_info = pd.DataFrame([st.session_state.pdf_info])
 
 if choice == sidebar_choice[0]:
 
@@ -123,42 +153,55 @@ if choice == sidebar_choice[0]:
         btn_read_data = st.button("Odczytaj dane")
         btn_save = st.button("Zapisz")
         if btn_save:
-            if st.session_state.pdf_info:
+            if not st.session_state.pdf_info.empty:
                 add_info_to_csv(csv_name, st.session_state.pdf_info)
             else:
                 st.error("Brak danych do zapisania. Najpierw odczytaj dane z pliku PDF.")
 
-    colB1, colB2 = st.columns([5,2])
+    colB1, colB2, colB3 = st.columns([5,1,1])
     with colB1:
         if uploaded_file is not None:
             converted_pdf_to_png = convert_pdf_to_png(uploaded_file)
             st.image(converted_pdf_to_png)
+            st.data_editor(st.session_state.pdf_info)
             if converted_pdf_to_png:
                 image_data = prepare_image_for_open_ai(converted_pdf_to_png)
             else:
                 st.error('Nie udało się przekonwertować pliku PDF')
         else:
-            st.text("Wczytaj plik pdf aby wyświetlić rysunek")
+            st.text("Wczytaj plik .pdf aby wyświetlić rysunek lub wprowadź dane ręcznie")
+            st.data_editor(st.session_state.pdf_info)
 
         if btn_read_data:
             if image_data:
                 st.session_state.pdf_info = read_data_from_document(image_data)
-                st.session_state.pdf_info_df = pd.DataFrame([st.session_state.pdf_info])
-                st.data_editor(st.session_state.pdf_info_df)
+                st.data_editor(st.session_state.pdf_info)
             else:
                 st.error('Nie udało się przygotować obrazu do OpenAI')
     with colB2:
-        if not st.session_state.pdf_info_df.empty:
-            drawing_number_value = st.session_state.pdf_info_df['drawing_number'].iloc[0]
-            st.text_input(label='Numer rysunku', value=drawing_number_value)
-        else:
-            st.text_input(label='Numer rysunku', value='')
+        add_edit_bar('drawing_number', 'Numer rysunku', 'text', r'%.1f', '0')
+        update_dataframe_from_inputs(st.session_state.pdf_info, 0, 'drawing_number')    
+        add_edit_bar('name', 'Nazwa', 'text', r'%.1f', '0')
+        update_dataframe_from_inputs(st.session_state.pdf_info, 0,'name')            
+        add_edit_bar('height_before_bending', 'Długość', 'number', r'%.1f', '0')
+        update_dataframe_from_inputs(st.session_state.pdf_info, 0,'height_before_bending')
+        add_edit_bar('width_before_bending', 'Szerokość', 'number', r'%.1f', '0')
+        update_dataframe_from_inputs(st.session_state.pdf_info, 0,'width_before_bending')
+        add_edit_bar('thickness', 'Grubość', 'number', r'%.1f', '0')
+        update_dataframe_from_inputs(st.session_state.pdf_info, 0,'thickness')
+        add_edit_bar('number_of_bends', 'Ilość gięć', 'number', r'%.1f', '0')
+        update_dataframe_from_inputs(st.session_state.pdf_info, 0,'number_of_bends')
+        add_edit_bar('bending_radius', 'Promień gięcia', 'number', r'%.1f', '0')
+        update_dataframe_from_inputs(st.session_state.pdf_info, 0,'bending_radius')
 
-        if not st.session_state.pdf_info_df.empty:
-            name_value = st.session_state.pdf_info_df['name'].iloc[0]
-            st.text_input(label='Nazwa', value=drawing_number_value)
-        else:
-            st.text_input(label='Nazwa', value='')
+    with colB3:
+        add_edit_bar('material', 'Materiał', 'text', r'%.1f', '0')            
+        add_edit_bar('mass', 'Waga', 'number', r'%.1f', '0')           
+        add_edit_bar('model', 'Model', 'number', r'%.1f', '0')
+        add_edit_bar('pattern', 'Wykrój', 'number', r'%.1f', '0')
+        add_edit_bar('drawing', 'Rysunek', 'number', r'%.1f', '0')
+        add_edit_bar('nums_of_corr', 'Numer poprawki', 'number', r'%.1f', '0')
+        add_edit_bar('additional_note', 'Uwagi', 'text', r'%.1f', '0')
 
 if choice == sidebar_choice[1]:
     data_df = pd.read_csv('dane.csv', encoding='ISO-8859-1')

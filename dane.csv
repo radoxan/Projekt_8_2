@@ -4,3 +4,6 @@ drawing_number,name,height_before_bending,width_before_bending,model,pattern,dra
 600.100.00.04,Wzmocnienie pod oœ,480.0,146.0,5,5,5,2,DX51D,2.5,3.0,1.23,,2
 601.001.00.04,Szyna do najazdów,57.0,1272.0,2,1,2,1,DX51D z,2.0,1.5,1.98,Wszelkie prawa zastrze¿one zgodnie z norm¹ ISO 1016,2
 601.001.00.07,Tablica pod najazdy,1301.0,64.5,6,5,6,1,DX51D,2.0,1.5,6.87,Niewymiarowana geometria wg dokumentacji DXF,3
+600.100.001,Pod³u¿nica,1000,200,0,0,0,0,,3,3,0,,3
+601.100.002L,Pod³u¿nica,2406.5,241.6,0,0,0,0,,2,1.5,0,,5
+601.100.02.20,Pod³u¿nica,244.10999999999999,2346.5,13,13,13,1,DX51D,2.0,1.5,8.76,1. Lewa 601.100.02.10 narysowana; Prawa 601.100.02.20 symetryczna. 2. Niewymiaryzowana geometria wg dokumentacji DXF.,3
